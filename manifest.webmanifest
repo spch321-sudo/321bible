@@ -1,0 +1,27 @@
+{
+  "name": "321聖經講義｜羅馬書",
+  "short_name": "321聖經講義",
+  "description": "羅馬書全書十六章：逐節原文解經、講章逐字稿、爭議地圖、原文軌跡與321生命應用。國度321空中團契。",
+  "lang": "zh-Hant",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#12305E",
+  "theme_color": "#1F4D3D",
+  "categories": ["books", "education", "lifestyle"],
+  "icons": [
+    { "src": "icons/favicon-32.png", "sizes": "32x32", "type": "image/png" },
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-384.png", "sizes": "384x384", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "今日", "short_name": "今日", "url": "./#today" },
+    { "name": "經文", "short_name": "經文", "url": "./#text" },
+    { "name": "課程", "short_name": "課程", "url": "./#course" }
+  ]
+}
