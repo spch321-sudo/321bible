@@ -272,9 +272,14 @@ mark{background:rgba(156,107,24,.3);color:inherit;padding:0 2px;border-radius:3p
 
 /* ── 畫線與領受 ── */
 .vs.hl .vt{background:linear-gradient(transparent 58%, rgba(156,107,24,.32) 58%)}
-.mkp{cursor:pointer;border-radius:6px;transition:background .15s}
-.mkp:active{background:var(--line)}
-.mkp.hl{background:linear-gradient(transparent 60%, rgba(156,107,24,.3) 60%)}
+.mkw{margin:0 0 14px}
+.mks{
+  cursor:pointer;border-radius:5px;transition:background .12s;
+  -webkit-tap-highlight-color:transparent;box-decoration-break:clone;-webkit-box-decoration-break:clone
+}
+.mks:active{background:var(--line)}
+.mks.hl{background:linear-gradient(transparent 60%, rgba(156,107,24,.32) 60%)}
+.mknote{display:block}
 .mknote{
   border-left:3px solid var(--brass);background:rgba(156,107,24,.08);
   border-radius:0 10px 10px 0;padding:10px 12px;margin:8px 0 12px;font-size:14.5px;line-height:1.8
@@ -315,10 +320,13 @@ mark{background:rgba(156,107,24,.3);color:inherit;padding:0 2px;border-radius:3p
 /* ── 小智 ── */
 .xzfab{
   position:fixed;right:16px;bottom:calc(78px + env(safe-area-inset-bottom));z-index:70;
-  width:54px;height:54px;border-radius:50%;border:0;cursor:pointer;
-  background:var(--pine);color:#fff;font-size:21px;
-  box-shadow:0 8px 26px rgba(31,77,61,.4);display:grid;place-items:center
+  border:0;cursor:pointer;border-radius:999px;padding:11px 17px 11px 14px;
+  background:var(--pine);color:#fff;font-family:var(--sans);
+  box-shadow:0 8px 26px rgba(31,77,61,.4);
+  display:flex;align-items:center;gap:7px;-webkit-tap-highlight-color:transparent
 }
+.xzfab i{font-style:normal;font-size:17px;line-height:1}
+.xzfab em{font-style:normal;font-size:15px;font-weight:600;letter-spacing:.04em;line-height:1;white-space:nowrap}
 html[data-dark="1"] .xzfab{color:#0E1412}
 .xz{position:fixed;inset:0;z-index:150;display:none}
 .xz.on{display:block}
@@ -461,7 +469,7 @@ setTimeout(function(){
   </div>
 </div>
 
-<button class="xzfab" id="xzfab" aria-label="問小智">✨</button>
+<button class="xzfab" id="xzfab" aria-label="問小智"><i>✨</i><em>小智</em></button>
 
 <div class="toast" id="toast"></div>
 
@@ -652,13 +660,19 @@ function vText(){
     const cls = b ? (b.star ? 'vs star has' : 'vs has') : 'vs';
     const note = (n === 16 && vn === 24) ? '<span class="flag" style="color:var(--dusk)">※ 較早抄本無此節</span>' : '';
     const tag = first && b.z > b.a ? `<span class="flag" style="color:var(--dusk)">解經　${b.a}–${b.z}節</span>` : '';
-    const mk = 'v|' + ref, on = mkHas(mk);
-    h += `<div class="${cls}${on ? ' hl' : ''}" data-mk="${mk}">
+    const t2 = D.txt[n][i];
+    const sents = splitHTML(esc(t2));
+    let vb = '', notes = '';
+    sents.forEach((sv, si) => {
+      const mk = 'v|' + ref + (sents.length > 1 ? '|' + si : ''), on = mkHas(mk);
+      vb += `<span class="mks${on ? ' hl' : ''}" onclick="event.stopPropagation();mkTap('${mk}',this)">${sv}</span>`;
+      if (on && mkNote(mk)) notes += `<div class="mknote" style="margin-left:29px">
+        <b>領受</b>　${esc(mkNote(mk))}
+        <button class="mkask" onclick="askXz(mkText('${mk}'),'領受：${escA(mkNote(mk))}')">✨ 問小智</button></div>`;
+    });
+    h += `<div class="${cls}" data-v="${ref}">
       <span class="vn" ${b ? `onclick="openV('${ref}')"` : ''}>${vn}</span>
-      <span class="vt" onclick="mkTap('${mk}',this.parentNode)">${esc(t)}${note}${tag}</span></div>`;
-    if (on && mkNote(mk)) h += `<div class="mknote" style="margin-left:29px">
-      <b>領受</b>　${esc(mkNote(mk))}
-      <button class="mkask" onclick="askXz(mkText('${mk}'),'領受：${escA(mkNote(mk))}')">✨ 問小智</button></div>`;
+      <span class="vt">${vb}${note}${tag}</span></div>` + notes;
   });
   h += '</div>';
   h += `<div class="hr"></div><button class="btn" onclick="go('course',${n})">看第 ${n} 章講義 ›</button>`;
@@ -1248,22 +1262,71 @@ function mkSave(k){
 function mkDel(k){ delete S.mk[k]; save(); $('#sheet').classList.remove('on'); render(); toast('已取消畫線'); }
 function mkText(k){
   const p = k.split('|');
-  if (p[0] === 'v'){ const [c, v] = p[1].split(':'); return (D.txt[c] || [])[+v - 1] || ''; }
+  if (p[0] === 'v'){
+    const [c, v] = p[1].split(':'); const full = (D.txt[c] || [])[+v - 1] || '';
+    if (p.length < 3) return full;
+    const s = splitHTML(esc(full))[+p[2]] || '';
+    return s.replace(/<[^>]+>/g, '').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&').trim();
+  }
+  if (p[0] === 'c'){
+    const m = meta(+p[1].split(':')[0]) || {};
+    return (m.card || [])[+p[3]] || '';
+  }
   const b = VMAP[p[1]]; if (!b) return '';
-  const html = b[p[2]] || '';
-  const paras = html.split(/<\/p>/).map(x => x.replace(/<[^>]+>/g, '').trim()).filter(Boolean);
-  return paras[+p[3]] || '';
+  const s = sentsOf(b[p[2]] || '')[+p[3]] || '';
+  return s.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 }
-/* 把解經 HTML 的每個 <p> 變成可點的段落 */
+/* 依句號切句；HTML 標籤不會被切斷，句末的引號跟著前一句走 */
+const EN_SENT = false;
+function splitHTML(html){
+  const out = []; let cur = '', depth = 0, inTag = false, tag = '';
+  for (let i = 0; i < html.length; i++){
+    const ch = html[i];
+    if (!inTag && ch === '<'){ inTag = true; tag = '<'; cur += ch; continue; }
+    if (inTag){
+      cur += ch; tag += ch;
+      if (ch === '>'){
+        inTag = false;
+        if (/^<\//.test(tag)) depth--;
+        else if (!/\/>$/.test(tag) && !/^<(br|img|hr|input|wbr)\b/i.test(tag)) depth++;
+      }
+      continue;
+    }
+    cur += ch;
+    if (depth !== 0) continue;                       // 標籤內不切
+    let brk = '。！？'.includes(ch);
+    if (!brk && EN_SENT && '.!?'.includes(ch)){      // 英文：句點後須接空白
+      const nx = html[i + 1];
+      brk = (nx === undefined || nx === ' ' || nx === '\n') && !/\b[A-Z]$/.test(cur.slice(-2, -1));
+    }
+    if (!brk) continue;
+    while (i + 1 < html.length && '」』）”"\''.includes(html[i + 1])){ i++; cur += html[i]; }
+    while (i + 1 < html.length && html[i + 1] === ' '){ i++; cur += html[i]; }
+    out.push(cur); cur = '';
+  }
+  if (cur.replace(/<[^>]*>|\s|&nbsp;/g, '').length) out.push(cur);
+  else if (cur && out.length) out[out.length - 1] += cur;
+  return out.length ? out : [html];
+}
+/* 取出某一層的所有句子（順序與畫面完全一致）*/
+function sentsOf(html){
+  const out = [];
+  String(html || '').replace(/<p>([\s\S]*?)<\/p>/g, (m, inner) => { splitHTML(inner).forEach(t => out.push(t)); return m; });
+  return out;
+}
+/* 把解經 HTML 的每一句變成可點的句子 */
 function tagParas(html, kp){
   if (!html) return '';
   let i = -1;
   return html.replace(/<p>([\s\S]*?)<\/p>/g, (m, inner) => {
-    i++; const k = kp + '|' + i, on = mkHas(k);
-    const note = on && mkNote(k)
-      ? `<div class="mknote"><b>領受</b>　${esc(mkNote(k))}
-         <button class="mkask" onclick="event.stopPropagation();askXz(mkText('${k}'),'領受：${escA(mkNote(k))}')">✨ 問小智</button></div>` : '';
-    return `<p class="mkp${on ? ' hl' : ''}" onclick="mkTap('${k}',this)">${inner}</p>${note}`;
+    const body = splitHTML(inner).map(t => {
+      i++; const k = kp + '|' + i, on = mkHas(k);
+      const note = on && mkNote(k)
+        ? `<span class="mknote"><b>領受</b>　${esc(mkNote(k))}
+           <button class="mkask" onclick="event.stopPropagation();askXz(mkText('${k}'),'領受：${escA(mkNote(k))}')">✨ 問小智</button></span>` : '';
+      return `<span class="mks${on ? ' hl' : ''}" onclick="event.stopPropagation();mkTap('${k}',this)">${t}</span>` + note;
+    }).join('');
+    return `<p class="mkw">${body}</p>`;
   });
 }
 const escA = s => String(s || '').replace(/'/g, '&#39;').replace(/"/g, '&quot;').replace(/\n/g, ' ').slice(0, 200);
