@@ -3,7 +3,7 @@
    策略：App 殼採 network-first（確保更新拿得到），失敗時回退快取；
          圖示等靜態檔採 cache-first。 */
 
-const VERSION = 'v2.0.0';
+const VERSION = 'v2.2.0';
 const CACHE = '321bible-' + VERSION;
 
 const SHELL = [
@@ -54,8 +54,11 @@ self.addEventListener('fetch', e => {
     e.respondWith(
       fetch(req)
         .then(res => {
-          const copy = res.clone();
-          caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+          // 只快取成功且完整的回應，避免把部署中的 404 或空回應存起來
+          if (res && res.ok && res.status === 200 && res.type !== 'opaque'){
+            const copy = res.clone();
+            caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+          }
           return res;
         })
         .catch(() => caches.match(req).then(r => r || caches.match('./index.html')))
@@ -67,8 +70,10 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     caches.match(req).then(hit =>
       hit || fetch(req).then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+        if (res && res.ok && res.status === 200){
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+        }
         return res;
       }).catch(() => hit)
     )
