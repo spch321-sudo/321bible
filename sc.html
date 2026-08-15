@@ -337,6 +337,8 @@ html[data-dark="1"] .xzfab{color:#0E1412}
   animation:up .22s ease
 }
 .xzh{display:flex;align-items:center;gap:8px;padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+.xzh button{flex:0 0 auto;white-space:nowrap}
+.xzh .ico{width:auto;min-width:34px;padding:0 9px;font-size:13.5px}
 .xzh b{font-family:var(--serif);font-size:17px}
 .xzb{flex:1;overflow:auto;padding:14px 16px;-webkit-overflow-scrolling:touch}
 .xzm{
@@ -383,6 +385,26 @@ html[data-dark="1"] .xzm.user{color:#0E1412}
 .vpill.on span{color:rgba(255,255,255,.75)}
 html[data-dark="1"] .vpill.on{color:#0E1412}
 html[data-dark="1"] .vpill.on span{color:rgba(0,0,0,.6)}
+
+/* ── 小智：收合與動作列 ── */
+.xzm.assistant{padding-bottom:8px}
+.xzt.clip{
+  display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;
+  overflow:hidden;position:relative
+}
+.xzmore{
+  display:block;margin:6px 0 0;border:0;background:transparent;padding:2px 0;
+  color:var(--pine);font:inherit;font-size:13px;font-weight:600;cursor:pointer
+}
+html[data-dark="1"] .xzmore{color:var(--brass)}
+.xzact{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px solid var(--line)}
+.xzact button{
+  border:1px solid var(--line);background:transparent;color:var(--dusk);
+  border-radius:9px;padding:5px 10px;font:inherit;font-size:12.5px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent
+}
+.xzact button.on{border-color:var(--brass);color:var(--brass);font-weight:600}
+.xzsv{font-size:15px;line-height:1.85;margin:0;white-space:normal}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -983,6 +1005,8 @@ function vMe(){
     <p class="sm muted" style="margin:0">复习中 ${Object.keys(S.mem).length} 节　·　笔记 ${Object.keys(S.notes).filter(k => S.notes[k]).length} 则</p></div>
   <button class="chrow" onclick="go('me',0,'marks')"><span class="chn">✍</span>
     <span style="flex:1"><b>我的画线与领受</b><span class="s">${Object.keys(S.mk).length} 处画线　·　${Object.keys(S.mk).filter(k=>mkNote(k)).length} 则领受</span></span></button>
+  <button class="chrow" onclick="go('me',0,'sage')"><span class="chn">✨</span>
+    <span style="flex:1"><b>小智收藏</b><span class="s">${S.xz.length} 则收藏</span></span></button>
   ${vLang()}
   <div class="card"><p class="eyebrow">朗读声音</p>
     <div class="vrow">${Object.keys(TTS_VOICES).map(k => `
@@ -1051,7 +1075,8 @@ const TTS_SIL = { s:140, c:140, e:260 };
 S.set.voice = S.set.voice || 'yunfan';
 S.set.rate  = S.set.rate  || 0;      // -3 ~ +3
 S.set.human = (S.set.human === undefined) ? 1 : S.set.human;
-S.mk = S.mk || {};                    // 画线与领受
+S.mk = S.mk || {};
+S.xz = S.xz || [];                    // 小智收藏                    // 画线与领受
 
 
 /* ═══════ 語言切換 ═══════ */
@@ -1489,8 +1514,21 @@ function drawXz(){
   el.classList.toggle('on', XZ.open);
   if (!XZ.open) return;
   const body = XZ.msgs.length
-    ? XZ.msgs.map((m, i) => `<div class="xzm ${m.role}">${esc(m.text).split('\n').join('<br>')}
-        ${m.role === 'assistant' ? `<button class="xzspk" onclick="speak(XZ.msgs[${i}].text,'小智')">🔊</button>` : ''}</div>`).join('')
+    ? XZ.msgs.map((m, i) => {
+        if (m.role !== 'assistant')
+          return `<div class="xzm user">${esc(m.text).split('\n').join('<br>')}</div>`;
+        const long = m.text.length > 240;
+        const col = long && m.col !== false;
+        const sav = xzSavedIdx(i) >= 0;
+        return `<div class="xzm assistant">
+          <div class="xzt ${col ? 'clip' : ''}">${esc(m.text).split('\n').join('<br>')}</div>
+          ${long ? `<button class="xzmore" onclick="XZ.msgs[${i}].col=${col ? 'false' : 'true'};drawXz()">${col ? '展开 ▾' : '收合 ▴'}</button>` : ''}
+          <div class="xzact">
+            <button onclick="speak(XZ.msgs[${i}].text,'小智')">🔊</button>
+            <button class="${sav ? 'on' : ''}" onclick="xzSave(${i})">${sav ? '★ 已收藏' : '☆ 收藏'}</button>
+            <button onclick="xzDel(${i})">删除</button>
+          </div></div>`;
+      }).join('')
     : `<div class="xzhi"><b>我是小智。</b><br>陪你读罗马书的小帮手。<br>
        <span class="xs muted">我不是圣灵，也不能代替你的牧者——有疑问，还是要回到圣经，并找真实的属灵同伴谈。</span></div>`;
   const quicks = XZ.msgs.length ? '' :
@@ -1506,6 +1544,57 @@ function drawXz(){
         <input id="xzin" placeholder="问小智…" onkeydown="if(event.key==='Enter')xzSend()">
         <button class="btn pri" onclick="xzSend()">送出</button></div></div>`;
   setTimeout(() => { const b = $('#xzb'); if (b) b.scrollTop = b.scrollHeight; }, 30);
+}
+function xzSavedIdx(i){
+  const a = XZ.msgs[i]; if (!a) return -1;
+  return S.xz.findIndex(x => x.a === a.text);
+}
+function xzSave(i){
+  const a = XZ.msgs[i]; if (!a) return;
+  const k = xzSavedIdx(i);
+  if (k >= 0){ S.xz.splice(k, 1); save(); drawXz(); return toast('已取消收藏'); }
+  let q = '';
+  for (let p = i - 1; p >= 0; p--) if (XZ.msgs[p].role === 'user'){ q = XZ.msgs[p].text; break; }
+  S.xz.unshift({ q, a:a.text, ch:(R.ch || S.last || 0), at:Date.now() });
+  save(); drawXz(); toast('已加入收藏');
+}
+function xzDel(i){
+  XZ.msgs.splice(i, 1);
+  if (i > 0 && XZ.msgs[i - 1] && XZ.msgs[i - 1].role === 'user') XZ.msgs.splice(i - 1, 1);
+  save(); drawXz(); toast('已删除');
+}
+function vXzSaved(){
+  setTitle('小智收藏', false);
+  if (!S.xz.length) return `<div class="sect"><p class="eyebrow">小智收藏</p>
+    <h2 class="big">还没有收藏任何回答。</h2><p class="sm muted">小智回答底下按「收藏」，就会存到这里。</p>
+    <button class="btn pri" style="margin-top:12px" onclick="xzOpen()">✨ 问小智</button></div>`;
+  let h = `<div class="sect"><p class="eyebrow">小智收藏</p>
+    <h2 class="big">${S.xz.length} 则收藏</h2></div>`;
+  S.xz.forEach((x, i) => {
+    h += `<div class="card" style="padding:14px">
+      <p class="xs muted" style="margin:0 0 7px">${x.ch ? '第 ' + x.ch + ' 章　·　' : ''}${new Date(x.at).toLocaleDateString()}</p>
+      ${x.q ? `<p class="mkq">${esc(x.q).slice(0, 120)}</p>` : ''}
+      <p class="xzsv">${esc(x.a).split('\n').join('<br>')}</p>
+      <div class="row" style="margin-top:10px">
+        <button class="btn xs2" onclick="speak(S.xz[${i}].a,'小智')">🔊</button>
+        <button class="btn xs2" onclick="xzPick(S.xz[${i}].q || S.xz[${i}].a.slice(0,60))">再问一次</button>
+        <button class="btn xs2" onclick="xzDrop(${i})">删除</button>
+      </div></div>`;
+  });
+  h += `<div class="hr"></div><button class="btn" onclick="xzExport()">导出收藏</button>`;
+  return h;
+}
+function xzDrop(i){ if (!confirm('确定要删除这则收藏吗？')) return; S.xz.splice(i, 1); save(); render(); toast('已删除'); }
+function xzExport(){
+  let t = '# 小智收藏\n\n';
+  S.xz.forEach(x => {
+    t += `## ${new Date(x.at).toLocaleDateString()}${x.ch ? '　第 ' + x.ch + ' 章' : ''}\n\n`;
+    if (x.q) t += `**Q:** ${x.q}\n\n`;
+    t += `${x.a}\n\n---\n\n`;
+  });
+  const b = new Blob([t], { type:'text/markdown' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(b); a.download = 'sage-saved.md'; a.click();
 }
 function xzPick(q){ XZ.msgs.push({ role:'user', text:q }); drawXz(); xzCall(); }
 
@@ -1550,6 +1639,7 @@ function render(){
   else if (R.tab === 'tools' && R.sub === 'safeall') h = vSafeAll();
   else if (R.tab === 'tools' && R.sub === 'search') h = vSearch();
   else if (R.tab === 'me' && R.sub === 'marks') h = vMarks();
+  else if (R.tab === 'me' && R.sub === 'sage') h = vXzSaved();
   else h = v[R.tab]();
   $('#view').innerHTML = h;
   document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === R.tab));
