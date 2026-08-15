@@ -3,24 +3,14 @@
    策略：App 殼採 network-first（確保更新拿得到），失敗時回退快取；
          圖示等靜態檔採 cache-first。 */
 
-const VERSION = 'v2.3.0';
+const VERSION = 'v3.0.0';
 const CACHE = '321bible-' + VERSION;
 
 const SHELL = [
   './',
   './index.html',
-  './sc/',
-  './sc/index.html',
-  './en/',
-  './en/index.html',
-  './manifest.webmanifest',
-  './icons/apple-touch-icon.png',
-  './icons/icon-192.png',
-  './icons/icon-384.png',
-  './icons/icon-512.png',
-  './icons/icon-maskable-512.png',
-  './icons/favicon-32.png',
-  './icons/favicon-16.png',
+  './sc.html',
+  './en.html',
 ];
 
 self.addEventListener('install', e => {
