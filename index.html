@@ -1041,18 +1041,36 @@ S.mk = S.mk || {};                    // 画线与领受
 
 
 /* ═══════ 語言切換 ═══════ */
+/* 路徑從目前網址推算，不寫死 —— 網站放在網域根目錄或 /倉庫名/ 底下都能運作 */
+function langRoot(){
+  try {
+    let p = location.pathname.replace(/index\.html$/, '');
+    if (!p.endsWith('/')) p += '/';
+    p = p.replace(/\/(sc|en)\/$/, '/');   // 若目前在子語言資料夾，退回上一層
+    return p;
+  } catch(e){ return '/'; }
+}
 const LANGS = [
-  { k:'tc', label:'繁體中文', sub:'和合本',            href:'../' },
-  { k:'sc', label:'简体中文', sub:'和合本',            href:'./' },
-  { k:'en', label:'English',  sub:'World English Bible', href:'../en/' },
+  { k:'tc', label:'繁體中文', sub:'和合本',              dir:''    },
+  { k:'sc', label:'简体中文', sub:'和合本',              dir:'sc/' },
+  { k:'en', label:'English',  sub:'World English Bible', dir:'en/' },
 ];
 const LANG_NOW = 'sc';
+function langURL(l){ return langRoot() + l.dir; }
+function goLang(k){
+  const l = LANGS.find(x => x.k === k); if (!l) return;
+  const url = langURL(l);
+  toast('检查中…');
+  fetch(url, { method:'HEAD' })
+    .then(r => { if (r.ok) location.href = url; else toast('这个网站上找不到该版本'); })
+    .catch(() => { location.href = url; });   // 無法檢查就直接前往
+}
 function vLang(){
   try { if (!/^https?:/.test(location.protocol)) return ''; } catch(e){ return ''; }
   return `<div class="card"><p class="eyebrow">语言</p>
     <div class="vrow">${LANGS.map(l => l.k === LANG_NOW
       ? `<span class="vpill on"><b>${l.label}</b><span>${l.sub}</span></span>`
-      : `<a class="vpill" href="${l.href}"><b>${l.label}</b><span>${l.sub}</span></a>`).join('')}</div>
+      : `<button class="vpill" onclick="goLang('${l.k}')"><b>${l.label}</b><span>${l.sub}</span></button>`).join('')}</div>
     <p class="xs muted" style="margin:10px 0 0">进度、画线与领受各语言版本分开储存。</p></div>`;
 }
 
