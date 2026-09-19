@@ -1,22 +1,32 @@
-/* 沉浸式聖經 — Service Worker
-   每次改動內容或程式，務必把 VERSION 往上加，
-   否則已安裝的使用者不會看到更新。 */
-const VERSION = 'ib-v1.0.4';
+/* 321聖經講義｜羅馬書 — Service Worker
+   目標：第一次連線之後，完全離線可用。
+   策略：App 殼採 network-first（確保更新拿得到），失敗時回退快取；
+         圖示等靜態檔採 cache-first。 */
+
+const VERSION = 'v3.4.0-c0b7dc24e332';
+const CACHE = '321bible-' + VERSION;
 
 const SHELL = [
-  './', './index.html', './app.js', './manifest.json', './toc.json', './cover.jpg',
-  './icon-72.png', './icon-96.png', './icon-128.png', './icon-144.png',
-  './icon-152.png', './icon-180.png', './icon-192.png', './icon-384.png', './icon-512.png', './icon-maskable-192.png', './icon-maskable-512.png'
+  './',
+  './index.html',
+  './sc.html',
+  './en.html',
+  './icon-512.png',
 ];
 
 self.addEventListener('install', e => {
-  self.skipWaiting();
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL).catch(() => {})));
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => c.addAll(SHELL))
+      .then(() => self.skipWaiting())
+      .catch(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
-    caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k))))
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -24,25 +34,44 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
-  const url = new URL(req.url);
-  if (url.origin !== location.origin) return;   // TTS / 陪讀 等外部請求不攔截
 
-  // 經文資料：cache-first（讀過一次即可離線）
-  if (/bible\.[a-z]+\.[a-z0-9]+\.json$/.test(url.pathname) || url.pathname.endsWith('toc.json')){
+  const url = new URL(req.url);
+  if (url.origin !== location.origin) return;
+
+  const isDoc = req.mode === 'navigate' || url.pathname.endsWith('/') || url.pathname.endsWith('.html');
+
+  if (isDoc) {
+    // network-first：有網路就拿最新的，沒網路就用快取
     e.respondWith(
-      caches.open(VERSION).then(c =>
-        c.match(req).then(hit => hit || fetch(req).then(res => { c.put(req, res.clone()); return res; }))
-      )
+      fetch(req)
+        .then(res => {
+          // 只快取成功且完整的回應，避免把部署中的 404 或空回應存起來
+          if (res && res.ok && res.status === 200 && res.type !== 'opaque'){
+            const copy = res.clone();
+            caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+          }
+          return res;
+        })
+        .catch(() => caches.match(req).then(r => r || caches.match('./index.html')))
     );
     return;
   }
 
-  // 其餘：network-first，離線時回落到快取
+  // cache-first：圖示等靜態資源
   e.respondWith(
-    fetch(req).then(res => {
-      const copy = res.clone();
-      caches.open(VERSION).then(c => c.put(req, copy)).catch(() => {});
-      return res;
-    }).catch(() => caches.match(req).then(hit => hit || caches.match('./index.html')))
+    caches.match(req).then(hit =>
+      hit || fetch(req).then(res => {
+        if (res && res.ok && res.status === 200){
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(req, copy)).catch(() => {});
+        }
+        return res;
+      }).catch(() => hit)
+    )
   );
+});
+
+// 讓網頁可以主動要求立即更新
+self.addEventListener('message', e => {
+  if (e.data === 'skipWaiting') self.skipWaiting();
 });
